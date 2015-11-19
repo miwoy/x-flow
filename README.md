@@ -21,6 +21,8 @@ node async x --> flow
 
 ##### 并行与串行结合部分
 ```` javascript
+var x = require("x-flow");
+ 
 /**
  *  测试并行与串行结合部分
  */
