@@ -72,7 +72,7 @@ xFlow.each = function(aryOrObj, cb1, cb2) {
         _.each(results, function(v, i) {
             results[i] = results[i][0];
         });
-        
+
         cb2(err, results);
     });
 };
@@ -102,6 +102,7 @@ xFlow.eachSync = function(aryOrObj, cb1, cb2, cb3) {
     });
     flow.end(function(err, results) {
         if (cb2) {
+            rlts = rlts || [];
             rlts.push(results[0][0]);
             cb2.apply(this, [err].concat(results[0][0]));
         }
