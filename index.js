@@ -250,7 +250,7 @@ function execQueue(queue, execDataArray, flow, index) {
             if (_.isFunction(callback)) {
                 rlt = callback.apply(null, _.values(arguments));
             } else {
-                flow.results[index] = [];
+                flow.results[index] = flow.results[index] || [];
                 flow.results[index].push(_.values(arguments).slice(1));
                 rlt = callback;
             }
