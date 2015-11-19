@@ -56,17 +56,17 @@ var obj = {
         }, 100);
     }
 };
-
+var b= "dasf";
 // 同步遍历
-x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
+// x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
+//     return [obj, obj.asyncFunc, [v, i]];
+// }, null, function(err, results) {
+//     console.log(results);
+// });
+
+// 异步遍历
+x.each(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
     return [obj, obj.asyncFunc, [v, i]];
 }, function(err, results) {
     console.log("results", results);
 });
-
-// // 异步遍历
-// x.each(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
-//     return [obj, obj.asyncFunc, [v, i]];
-// }, function(err, results) {
-//     console.log("results", results);
-// });

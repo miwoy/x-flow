@@ -69,6 +69,10 @@ xFlow.each = function(aryOrObj, cb1, cb2) {
     });
 
     flow.end(function(err, results) {
+        _.each(results, function(v, i) {
+            results[i] = results[i][0];
+        });
+        
         cb2(err, results);
     });
 };
@@ -76,13 +80,36 @@ xFlow.each = function(aryOrObj, cb1, cb2) {
 /**
  * each同步版
  */
-xFlow.eachSync = function(aryOrObj, cb1, cb2) {
+xFlow.eachSync = function(aryOrObj, cb1, cb2, cb3) {
     var flow = new Flow();
+    var rlts;
     _.each(aryOrObj, function(v, k) {
-        flow.next(cb1(v, k));
+        if (cb2) {
+            flow.next(function() {
+                if (arguments.length > 0) {
+                    rlts = rlts || [];
+                    rlts.push(_.values(arguments).slice(1));
+                    cb2.apply(this, _.values(arguments));
+
+                }
+
+                return cb1(v, k);
+            });
+        } else {
+            flow.next(cb1(v, k));
+        }
+
     });
     flow.end(function(err, results) {
-        cb2(err, results);
+        if (cb2) {
+            rlts.push(results[0][0]);
+            cb2.apply(this, [err].concat(results[0][0]));
+        }
+        if (cb3) {
+            rlts = rlts || results[0];
+            cb3(err, rlts);
+        }
+        
     });
 };
 
