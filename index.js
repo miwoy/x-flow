@@ -5,12 +5,49 @@ var xFlow = {};
 
 
 // 开始一个x --> 流
-xFlow.begin = function(func, args) {
+xFlow.begin = function() {
+
+    if (arguments.length === 1) {
+        throw new Error("不可以省略异步函数参数数组");
+    }
+
+    if (arguments.length === 2) {
+
+        if (!_.isFunction(arguments[0])) {
+            throw new Error("异步函数", arguments[0], "类型错误");
+        }
+
+
+
+        if (arguments[1] && !_.isArray(arguments[1])) {
+            throw new Error("异步函数参数数组必须存在，且为数组格式：", arguments[1]);
+        }
+    }
+
+    if (arguments.length === 3) {
+        if (!(_.isObject(arguments[0]) && !_.isFunction(arguments[0]) && !_.isArray(arguments[0]))) {
+            throw new Error("参数类型错误!异步函数执行上下文：", arguments[0], "必须是一个对象");
+        }
+    }
+
+
+
+
+
+
     var flow = new Flow();
-    if (func && args) {
+    if (arguments[0]) {
+        var func = arguments[0],
+            args = arguments[1];
+        var rlt = [];
+        if (arguments.length === 1 && _.isArray(arguments[0])) {
+            rlt = arguments[0];
+        } else {
+            rlt = _.values(arguments);
+        }
         var queue = [];
         flow.matrix.push(queue);
-        execQueue(queue, func, args, flow);
+        execQueue(queue, rlt, flow);
     }
 
     return flow;
@@ -42,7 +79,7 @@ xFlow.each = function(aryOrObj, cb1, cb2) {
 xFlow.eachSync = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
     _.each(aryOrObj, function(v, k) {
-        flow.next(cb1(v));
+        flow.next(cb1(v, k));
     });
     flow.end(function(err, results) {
         cb2(err, results);
@@ -64,29 +101,55 @@ function Flow() {
  *                             如果需要上一次异步操作的结果，可在参数中获取
  *                             在不需要即使处理上一步结果时可填写两个参数 func,args 或 [func,args]
  *                             如使用callback，需要确保callback要有返回值，返回[func,args]
+ *                             如果该异步函数依赖于一个环境时，需要把该环境传递进来
  */
-Flow.prototype.next = function(callback) {
+Flow.prototype.next = function() {
+
+    if (arguments.length === 0) {
+        throw new Error("参数个数必须大于0");
+    }
+    if (arguments.length === 1) {
+        if (!(_.isFunction(arguments[0]) || _.isArray(arguments[0]))) {
+            throw new Error("参数必须是一个回调函数\n或异步执行数据\n或是一个异步执行数据数组,");
+        }
+
+    }
+
+    if (arguments.length === 2) {
+        if (!(_.isFunction(arguments[0]) || _.isArray(arguments[0]))) {
+            throw new Error("参数必须是一个回调函数\n或异步执行数据\n或是一个异步执行数据数组,");
+        }
+
+    }
+
+
+
+
+
+
     var queue;
     var rlt;
     if (this.matrix.length === 0) {
         queue = [];
         this.matrix.push(queue);
-        if (arguments.length === 1 && _.isFunction(callback)) {
-            rlt = callback();
-        } else if (arguments.length === 1 &&_.isArray(callback)){
-            rlt = callback;
+        if (arguments.length === 1 && _.isFunction(arguments[0])) {
+            rlt = arguments[0]();
+        } else if (arguments.length === 1 && _.isArray(arguments[0])) {
+            rlt = arguments[0];
 
-        }  else if (arguments.length === 2){
-        	rlt = [arguments[0], arguments[1]];
+        } else if (arguments.length === 2) {
+            rlt = [arguments[0], arguments[1]];
+        } else if (arguments.length === 3) {
+            rlt = [arguments[0], arguments[1], arguments[2]];
         } else {
-        	throw new Error("参数有误：",arguments);
+            throw new Error("参数有误：", arguments);
         }
-        execQueue(queue, rlt[0], rlt[1], this);
+        execQueue(queue, rlt, this);
     } else {
         // callback 回调上一次异步结果
         queue = this.matrix[this.matrix.length - 1];
-        if (arguments.length <= 1) {
-            queue.push(callback);
+        if (arguments.length === 1) {
+            queue.push(arguments[0]);
         } else {
             queue.push(_.values(arguments));
         }
@@ -99,19 +162,21 @@ Flow.prototype.next = function(callback) {
 
 /**
  * 并行执行
- * @param  {[type]} func 要执行的异步函数，确保参数中回调函数位置在参数最后一位
- *                       可接受单个数组参数[func, args]
- * @param  {[type]} args 异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
+ * @param  {Object} content 执行环境，如果该异步函数依赖于一个环境时，需要把该环境传递进来
+ * @param  {Function} func  要执行的异步函数，确保参数中回调函数位置在参数最后一位
+ *                          可接受单个数组参数[func, args]
+ * @param  {Array} args     异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
  */
-Flow.prototype.fork = function(func, args) {
-
-	if (_.isArray(func)) {
-		args = func[1];
-		func = func[0];
-	}
+Flow.prototype.fork = function() {
+    var rlt = [];
+    if (arguments.length === 1 && _.isArray(arguments[0])) {
+        rlt = arguments[0];
+    } else {
+        rlt = _.values(arguments);
+    }
     var queue = [];
     this.matrix.push(queue);
-    execQueue(queue, func, args, this);
+    execQueue(queue, rlt, this);
     return this;
     // 并行操作 func 结果存入flow队列中
 };
@@ -119,29 +184,32 @@ Flow.prototype.fork = function(func, args) {
 /**
  * 结束
  * @param  {Function} callback err,results 当流程出现错误时会第一时间传递给err,没有错误则将流程内未处理的结果集合并成一个数组对象
- * @return {[type]}            [description]
  */
 Flow.prototype.end = function(callback) {
     var num = 1;
     var cded = false;
     var self = this;
-    var forkSuccess = function(err, result) {
-        if (cded) {
-            return;
-        }
-        if (err) {
-            self.matrix = null;
-            cded = true;
-            return callback(err, null);
-        }
-        self.results.push(_.values(arguments).slice(1));
-        if (++num > self.matrix.length) {
-            callback(err, self.results);
-            self.matrix = null;
-        }
+    var forkSuccess = function(i) {
+        var index = i;
+        return function(err, result) {
+            if (cded) {
+                return;
+            }
+            if (err) {
+                self.matrix = null;
+                cded = true;
+                return callback(err, null);
+            }
+            self.results[i] = self.results[i] || [];
+            self.results[i].push(_.values(arguments).slice(1));
+            if (++num > self.matrix.length) {
+                callback(err, self.results);
+                self.matrix = null;
+            }
+        };
     };
     _.each(this.matrix, function(queue, i) {
-        queue.push(forkSuccess);
+        queue.push(forkSuccess(i));
     });
 
     // callback 结果数组
@@ -150,10 +218,21 @@ Flow.prototype.end = function(callback) {
 /**
  * 队列执行的封装函数
  */
-function execQueue(queue, func, args, flow) {
+function execQueue(queue, execDataArray, flow, index) {
+    var content, func, args;
+    index = index || flow.matrix.length - 1;
+    if (execDataArray.length === 3) {
+        content = execDataArray[0];
+        func = execDataArray[1];
+        args = execDataArray[2];
+    } else if (execDataArray.length === 2) {
+        content = this;
+        func = execDataArray[0];
+        args = execDataArray[1];
+    }
 
     args.push(function(err, result) {
-    	var callback;
+        var callback;
         if (err) {
             callback = queue[queue.length - 1];
             if (_.isFunction(callback)) {
@@ -171,17 +250,17 @@ function execQueue(queue, func, args, flow) {
             if (_.isFunction(callback)) {
                 rlt = callback.apply(null, _.values(arguments));
             } else {
-                flow.results.push(_.values(arguments).slice(1));
+                flow.results[index] = [];
+                flow.results[index].push(_.values(arguments).slice(1));
                 rlt = callback;
             }
 
             if (rlt)
-                execQueue(queue, rlt[0], rlt[1], flow);
+                execQueue(queue, rlt, flow, index);
         }
 
     });
 
-    func.apply(this, args);
+    func.apply(content, args || []);
 
 }
-
