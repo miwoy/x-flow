@@ -270,16 +270,16 @@ function execQueue(queue, execDataArray, flow, index) {
             }
 
         }
-
+        var cbArguments = arguments;
         (function() {
             if (queue.length > 0) {
                 callback = queue.shift();
                 var rlt;
                 if (_.isFunction(callback)) {
-                    rlt = callback.apply(null, _.values(arguments));
+                    rlt = callback.apply(null, _.values(cbArguments));
                 } else {
                     flow.results[index] = flow.results[index] || [];
-                    flow.results[index].push(_.values(arguments).slice(1));
+                    flow.results[index].push(_.values(cbArguments).slice(1));
                     rlt = callback;
                 }
 
