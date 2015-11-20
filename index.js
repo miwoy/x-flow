@@ -110,7 +110,7 @@ xFlow.eachSync = function(aryOrObj, cb1, cb2, cb3) {
             rlts = rlts || results[0];
             cb3(err, rlts);
         }
-        
+
     });
 };
 
@@ -259,7 +259,7 @@ function execQueue(queue, execDataArray, flow, index) {
         args = execDataArray[1];
     }
 
-    args.push(function(err, result) {
+    args.push(function(err) {
         var callback;
         if (err) {
             callback = queue[queue.length - 1];
@@ -271,21 +271,25 @@ function execQueue(queue, execDataArray, flow, index) {
 
         }
 
+        (function() {
+            if (queue.length > 0) {
+                callback = queue.shift();
+                var rlt;
+                if (_.isFunction(callback)) {
+                    rlt = callback.apply(null, _.values(arguments));
+                } else {
+                    flow.results[index] = flow.results[index] || [];
+                    flow.results[index].push(_.values(arguments).slice(1));
+                    rlt = callback;
+                }
 
-        if (queue.length > 0) {
-            callback = queue.shift();
-            var rlt;
-            if (_.isFunction(callback)) {
-                rlt = callback.apply(null, _.values(arguments));
-            } else {
-                flow.results[index] = flow.results[index] || [];
-                flow.results[index].push(_.values(arguments).slice(1));
-                rlt = callback;
+
+                if (rlt)
+                    execQueue(queue, rlt, flow, index);
+                else
+                    arguments.callee();
             }
-
-            if (rlt)
-                execQueue(queue, rlt, flow, index);
-        }
+        })();
 
     });
 

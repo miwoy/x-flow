@@ -3,23 +3,34 @@ node async x --> flow
 
 ## 安装
 
-<pre>npm install x-flow</pre>
+    npm install x-flow
+
+## 介绍
+
+  这是一个小型的异步流程控制工具，不同于Async的地方在于用的是链式调用，并且少了很多匿名的回调函数，看起来更简洁。
+
+  核心函数只有两个fork与next，fork代表一个并行分支，next代表一个分支下的串行步骤，当然首先你需要用begin函数返回一个flow对象。 并用end函数结束flow.
+
+  此工具对异步函数有两个约定：
+
+  1. **异步函数必须存在callback,且是参数的最后一个位置,因为flow需要知道该异步函数在什么时候结束**
+  2. **回调函数参数必须存在err,且是参数第一个位置,因为flow通过检测回调的第一个参数判断是否出现异常**
 
 ## 使用说明
 
-===========================注意================================
+===========================***注意***================================
 
-**x流执行数据结构是一个数组对象：[content,func,args]**
+* **x流执行数据结构是一个数组对象：[content,func,args]**
 
-**其中如果func不依赖于一个执行环境可省略或传入this或null**
+* **其中如果func不依赖于一个执行环境可省略content或传入this或null**
 
-**强烈建议不省略content**
+* **强烈建议不省略content**
 
-**args参数不可省略!!!如异步函数不需要参数时传入[]或null**
+* **args参数不可省略!!!如异步函数不需要参数时传入[]或null**
 
 ==============================================================
 
-##### 并行与串行结合部分
+#### 并行与串行结合部分
 ```` javascript
 var x = require("x-flow");
  
@@ -66,7 +77,7 @@ x.begin()
     });
 ````
 -------------------
-##### each与eachSync部分	
+#### each与eachSync部分	
 ```` javascript
 /**
  * 测试each与eachSync部分
@@ -81,14 +92,14 @@ var obj = {
     }
 };
 
-// 同步遍历
+// 串行遍历
 x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
     return [obj, obj.asyncFunc, [v, i]];
 }, function(err, results) {
     console.log("result", results);
 });
 
-// 异步遍历
+// 并行遍历
 x.each(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
     return [obj, obj.asyncFunc, [v, i]];
 }, function(err, results) {
