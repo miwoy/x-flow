@@ -23,7 +23,8 @@ x.begin()
     // 用回调函数获取上一次异步结果，并返回一个x流执行数据结构的数组对象
     .next(function(err, result) {
     	console.log(result);
-        return [obj, obj.asyncFunc, [1,2]];
+        return [true]
+        //return [obj, obj.asyncFunc, [1,2]];
     })
     // 开启一个分支。分支将与begin主线并行执行
     .fork(obj, obj.asyncFunc, [2,1])

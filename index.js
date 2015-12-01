@@ -196,6 +196,7 @@ Flow.prototype.next = function() {
  * @param  {Array} args     异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
  */
 Flow.prototype.fork = function() {
+    if (arguments.length === 0) throw new Error("fork必须有参数，且为流执行数据结构");
     var rlt = [];
     if (arguments.length === 1 && _.isArray(arguments[0])) {
         rlt = arguments[0];
@@ -228,8 +229,12 @@ Flow.prototype.end = function(callback) {
                 cded = true;
                 return callback(err, result);
             }
+
             self.results[i] = self.results[i] || [];
-            self.results[i].push(_.values(arguments).slice(1));
+            if (result !== undefined) { 
+                self.results[i].push(_.values(arguments).slice(1));
+            }
+
             if (++num > self.matrix.length) {
                 callback(err, self.results);
                 self.matrix = null;
@@ -262,6 +267,8 @@ function execQueue(queue, execDataArray, flow, index) {
     args.push(function(err) {
         var callback;
         var cbArguments = arguments;
+
+        // 出现错误时，将错误传入end，并终止流
         if (err) {
             callback = queue[queue.length - 1];
             if (_.isFunction(callback)) {
@@ -271,24 +278,42 @@ function execQueue(queue, execDataArray, flow, index) {
             }
 
         }
-        
+
         (function() {
             if (queue.length > 0) {
                 callback = queue.shift();
                 var rlt;
+
+                // 从队列中取函数执行
                 if (_.isFunction(callback)) {
                     rlt = callback.apply(null, _.values(cbArguments));
+                    cbArguments = null;
                 } else {
-                    flow.results[index] = flow.results[index] || [];
-                    flow.results[index].push(_.values(cbArguments).slice(1));
+                    if (cbArguments) {
+                        flow.results[index] = flow.results[index] || [];
+                        flow.results[index].push(_.values(cbArguments).slice(1));
+                    }
+
                     rlt = callback;
                 }
 
 
-                if (rlt)
+                if (_.isArray(rlt) && rlt.length > 0) {
+                    // 中断流
+                    if (_.isArray(rlt) && rlt[0] === true) {
+                        callback = queue[queue.length - 1];
+                        if (_.isFunction(callback)) {
+                            callback(rlt[0], rlt.slice(1));
+                            return ;
+                        } else {
+                            throw err;
+                        }
+                    }
+
                     execQueue(queue, rlt, flow, index);
-                else
+                } else {
                     arguments.callee();
+                }
             }
         })();
 
