@@ -190,7 +190,7 @@ Flow.prototype.next = function() {
 
 /**
  * 并行执行
- * @param  {Object} content 执行环境，如果该异步函数依赖于一个环境时，需要把该环境传递进来
+ * @param  {Object} context 执行环境，如果该异步函数依赖于一个环境时，需要把该环境传递进来
  * @param  {Function} func  要执行的异步函数，确保参数中回调函数位置在参数最后一位
  *                          可接受单个数组参数[func, args]
  * @param  {Array} args     异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
@@ -226,7 +226,7 @@ Flow.prototype.end = function(callback) {
             if (err) {
                 self.matrix = null;
                 cded = true;
-                return callback(err, null);
+                return callback(err, result);
             }
             self.results[i] = self.results[i] || [];
             self.results[i].push(_.values(arguments).slice(1));
@@ -247,30 +247,31 @@ Flow.prototype.end = function(callback) {
  * 队列执行的封装函数
  */
 function execQueue(queue, execDataArray, flow, index) {
-    var content, func, args;
+    var context, func, args;
     index = index || flow.matrix.length - 1;
     if (execDataArray.length === 3) {
-        content = execDataArray[0];
+        context = execDataArray[0];
         func = execDataArray[1];
         args = execDataArray[2];
     } else if (execDataArray.length === 2) {
-        content = this;
+        context = this;
         func = execDataArray[0];
         args = execDataArray[1];
     }
 
     args.push(function(err) {
         var callback;
+        var cbArguments = arguments;
         if (err) {
             callback = queue[queue.length - 1];
             if (_.isFunction(callback)) {
-                return callback(err);
+                return callback(err, _.values(cbArguments).slice(1));
             } else {
                 throw err;
             }
 
         }
-        var cbArguments = arguments;
+        
         (function() {
             if (queue.length > 0) {
                 callback = queue.shift();
@@ -293,6 +294,6 @@ function execQueue(queue, execDataArray, flow, index) {
 
     });
 
-    func.apply(content, args || []);
+    func.apply(context, args || []);
 
 }
