@@ -6,50 +6,7 @@ var xFlow = {};
 
 // 开始一个x --> 流
 xFlow.begin = function() {
-
-    if (arguments.length === 1) {
-        throw new Error("不可以省略异步函数参数数组");
-    }
-
-    if (arguments.length === 2) {
-
-        if (!_.isFunction(arguments[0])) {
-            throw new Error("异步函数", arguments[0], "类型错误");
-        }
-
-
-
-        if (arguments[1] && !_.isArray(arguments[1])) {
-            throw new Error("异步函数参数数组必须存在，且为数组格式：", arguments[1]);
-        }
-    }
-
-    if (arguments.length === 3) {
-        if (!(_.isObject(arguments[0]) && !_.isFunction(arguments[0]) && !_.isArray(arguments[0]))) {
-            throw new Error("参数类型错误!异步函数执行上下文：", arguments[0], "必须是一个对象");
-        }
-    }
-
-
-
-
-
-
     var flow = new Flow();
-    if (arguments[0]) {
-        var func = arguments[0],
-            args = arguments[1];
-        var rlt = [];
-        if (arguments.length === 1 && _.isArray(arguments[0])) {
-            rlt = arguments[0];
-        } else {
-            rlt = _.values(arguments);
-        }
-        var queue = [];
-        flow.matrix.push(queue);
-        execQueue(queue, rlt, flow);
-    }
-
     return flow;
 
 };
@@ -119,7 +76,6 @@ module.exports = xFlow;
 // 流对象
 function Flow() {
     this.matrix = [];
-    this.results = [];
 }
 
 /**
@@ -131,56 +87,20 @@ function Flow() {
  *                             如使用callback，需要确保callback要有返回值，返回[func,args]
  *                             如果该异步函数依赖于一个环境时，需要把该环境传递进来
  */
-Flow.prototype.next = function() {
+Flow.prototype.step = function() {
 
-    if (arguments.length === 0) {
-        throw new Error("参数个数必须大于0");
-    }
-    if (arguments.length === 1) {
-        if (!(_.isFunction(arguments[0]) || _.isArray(arguments[0]))) {
-            throw new Error("参数必须是一个回调函数\n或异步执行数据\n或是一个异步执行数据数组,");
-        }
+    if (arguments.length === 0 || !_.isFunction(arguments[0])) return this;
 
-    }
-
-    if (arguments.length === 2) {
-        if (!(_.isFunction(arguments[0]) || _.isArray(arguments[0]))) {
-            throw new Error("参数必须是一个回调函数\n或异步执行数据\n或是一个异步执行数据数组,");
-        }
-
-    }
-
-
-
-
-
-
-    var queue;
+    var context;
     var rlt;
     if (this.matrix.length === 0) {
-        queue = [];
-        this.matrix.push(queue);
-        if (arguments.length === 1 && _.isFunction(arguments[0])) {
-            rlt = arguments[0]();
-        } else if (arguments.length === 1 && _.isArray(arguments[0])) {
-            rlt = arguments[0];
+        context = new Context();
+        context.queue.push(arguments[0]);
+        this.matrix.push(context);
 
-        } else if (arguments.length === 2) {
-            rlt = [arguments[0], arguments[1]];
-        } else if (arguments.length === 3) {
-            rlt = [arguments[0], arguments[1], arguments[2]];
-        } else {
-            throw new Error("参数有误：", arguments);
-        }
-        execQueue(queue, rlt, this);
     } else {
-        // callback 回调上一次异步结果
-        queue = this.matrix[this.matrix.length - 1];
-        if (arguments.length === 1) {
-            queue.push(arguments[0]);
-        } else {
-            queue.push(_.values(arguments));
-        }
+        context = this.matrix[this.matrix.length - 1];
+        context.queue.push(arguments[0]);
 
     }
 
@@ -196,129 +116,76 @@ Flow.prototype.next = function() {
  * @param  {Array} args     异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
  */
 Flow.prototype.fork = function() {
-    if (arguments.length === 0) throw new Error("fork必须有参数，且为流执行数据结构");
-    var rlt = [];
-    if (arguments.length === 1 && _.isArray(arguments[0])) {
-        rlt = arguments[0];
-    } else {
-        rlt = _.values(arguments);
-    }
-    var queue = [];
-    this.matrix.push(queue);
-    execQueue(queue, rlt, this);
+    var context = new Context();
+
+    if (_.isFunction(arguments[0])) context.queue.push(arguments[0]);
+
+    this.matrix.push(context);
+
     return this;
-    // 并行操作 func 结果存入flow队列中
 };
 
 /**
  * 结束
  * @param  {Function} callback err,results 当流程出现错误时会第一时间传递给err,没有错误则将流程内未处理的结果集合并成一个数组对象
  */
-Flow.prototype.end = function(callback) {
+Flow.prototype.exec = function(callback) {
+    var self = this;
     var num = 1;
     var cded = false;
-    var self = this;
-    var forkSuccess = function(i) {
+    var results = new Array(this.matrix.length);
+    var forkEnd = function(i) {
         var index = i;
-        return function(err, result) {
+        return function(err, context) {
+
             if (cded) {
                 return;
             }
+
+            delete context.queue;
+            delete context.index;
+
             if (err) {
-                self.matrix = null;
                 cded = true;
-                return callback(err, result);
+                return callback(err, context);
             }
 
-            self.results[i] = self.results[i] || [];
-            if (result !== undefined) { 
-                self.results[i].push(_.values(arguments).slice(1));
-            }
-
+            results[i] = context;
             if (++num > self.matrix.length) {
-                callback(err, self.results);
-                self.matrix = null;
+                callback(err, results);
             }
         };
     };
-    _.each(this.matrix, function(queue, i) {
-        queue.push(forkSuccess(i));
-    });
 
-    // callback 结果数组
+    _.each(this.matrix, function(context, i) {
+        context.queue.push(forkEnd(i));
+        context.queue[0].call(context);
+    });
 };
 
-/**
- * 队列执行的封装函数
- */
-function execQueue(queue, execDataArray, flow, index) {
-    var context, func, args;
-    index = index || flow.matrix.length - 1;
-    if (execDataArray.length === 3) {
-        context = execDataArray[0];
-        func = execDataArray[1];
-        args = execDataArray[2];
-    } else if (execDataArray.length === 2) {
-        context = this;
-        func = execDataArray[0];
-        args = execDataArray[1];
-    }
-
-    args.push(function(err) {
-        var callback;
-        var cbArguments = arguments;
-
-        // 出现错误时，将错误传入end，并终止流
-        if (err) {
-            callback = queue[queue.length - 1];
-            if (_.isFunction(callback)) {
-                return callback(err, _.values(cbArguments).slice(1));
-            } else {
-                throw err;
-            }
-
-        }
-
-        (function() {
-            if (queue.length > 0) {
-                callback = queue.shift();
-                var rlt;
-
-                // 从队列中取函数执行
-                if (_.isFunction(callback)) {
-                    rlt = callback.apply(null, _.values(cbArguments));
-                    cbArguments = null;
-                } else {
-                    if (cbArguments) {
-                        flow.results[index] = flow.results[index] || [];
-                        flow.results[index].push(_.values(cbArguments).slice(1));
-                    }
-
-                    rlt = callback;
-                }
 
 
-                if (_.isArray(rlt) && rlt.length > 0) {
-                    // 中断流
-                    if (_.isArray(rlt) && rlt[0] === true) {
-                        callback = queue[queue.length - 1];
-                        if (_.isFunction(callback)) {
-                            callback(rlt[0], rlt.slice(1));
-                            return ;
-                        } else {
-                            throw err;
-                        }
-                    }
-
-                    execQueue(queue, rlt, flow, index);
-                } else {
-                    arguments.callee();
-                }
-            }
-        })();
-
-    });
-
-    func.apply(context, args || []);
-
+function Context() {
+    this.queue = [];
+    this.index = 0;
 }
+
+Context.prototype.next = function() {
+    this.index++;
+    this.queue[this.index].call(this);
+};
+Context.prototype.go = function(count) {
+    if (_.isNumber(count)) throw new Error("参数必须为数字！");
+    if (count + this.index < 0 || count + this.index > this.queue.length - 2) throw new Error("索引超出界限！");
+
+
+    this.index += count;
+    this.queue[this.index].call(this);
+};
+Context.prototype.err = function(err) {
+    this.queue[this.queue.length - 1](err, this);
+};
+Context.prototype.end = function(err) {
+    this.queue[this.queue.length - 1](err, this);
+
+};

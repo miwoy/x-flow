@@ -19,19 +19,40 @@ var obj = {
 // 开始一个x流，可以为begin传递一个x流数据结构
 x.begin()
 	// 指定异步函数执行上下文
-    .next(obj, obj.asyncFunc, [1,1])
+    .step(function(){
+        var self = this;
+        obj.asyncFunc(1,1, function(err, result) {
+            self.step1 = true;
+            self.err(true);
+            //self.next();
+        });
+    })
     // 用回调函数获取上一次异步结果，并返回一个x流执行数据结构的数组对象
-    .next(function(err, result) {
-    	console.log(result);
-        return [true]
-        //return [obj, obj.asyncFunc, [1,2]];
+    .step(function(){
+        var self = this;
+        obj.asyncFunc(1,2, function(err, result) {
+            self.step2 = true;
+            self.end();
+        });
     })
     // 开启一个分支。分支将与begin主线并行执行
-    .fork(obj, obj.asyncFunc, [2,1])
+    .fork()
     // 未获取上次异步函数执行结果，将会把结果传递至end函数results中
-    .next(obj, obj.asyncFunc, [2,2])
+    .step(function(){
+        var self = this;
+        obj.asyncFunc(2,1, function(err, result) {
+            self.step1 = true;
+            self.next();
+        });
+    })
     // 未获取上次异步执行结果，并未传递异步函数执行上下文
-    .next(obj.asyncFunc, [2,3])
+    .step(function(){
+        var self = this;
+        obj.asyncFunc(2,2, function(err, result) {
+            self.step2 = true;
+            self.end();
+        });
+    })
     /** 
      * x流结束，当流中某处出现错误时都将直接执行end方法
      * 并将错误传给err参数
@@ -40,8 +61,8 @@ x.begin()
      * 通常每个分支只有最后一个next的返回值未获取，那么当你取begin分支的结果事可能是这样的 results[0][0]
      * results[0][0][0] 代表第一个分支第一个未获取的next返回值的非err的第一个参数	
      **/
-    .end(function(err, results) {
-        console.log("end", results);
+    .exec(function(err, results) {
+        console.log("end",err, results);
     });
 
 
