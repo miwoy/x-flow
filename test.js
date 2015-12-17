@@ -22,9 +22,7 @@ x.begin()
     .step(function(self){
         obj.asyncFunc(1,1, function(err, result) {
             self.step1 = true;
-            self.err();
-            //self.next();
-            console.log("");
+            self.next();
         });
     })
     // 用回调函数获取上一次异步结果，并返回一个x流执行数据结构的数组对象
