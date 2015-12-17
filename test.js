@@ -19,8 +19,7 @@ var obj = {
 // 开始一个x流，可以为begin传递一个x流数据结构
 x.begin()
 	// 指定异步函数执行上下文
-    .step(function(){
-        var self = this;
+    .step(function(self){
         obj.asyncFunc(1,1, function(err, result) {
             self.step1 = true;
             self.err();
@@ -28,8 +27,7 @@ x.begin()
         });
     })
     // 用回调函数获取上一次异步结果，并返回一个x流执行数据结构的数组对象
-    .step(function(){
-        var self = this;
+    .step(function(self){
         obj.asyncFunc(1,2, function(err, result) {
             self.step2 = true;
             self.end();
@@ -38,16 +36,14 @@ x.begin()
     // 开启一个分支。分支将与begin主线并行执行
     .fork()
     // 未获取上次异步函数执行结果，将会把结果传递至end函数results中
-    .step(function(){
-        var self = this;
+    .step(function(self){
         obj.asyncFunc(2,1, function(err, result) {
             self.step1 = true;
             self.next();
         });
     })
-    // 未获取上次异步执行结果，并未传递异步函数执行上下文
-    .step(function(){
-        var self = this;
+    // 未获取上次异步执行结果，并未传递异步函数执行上下文 
+    .step(function(self){
         obj.asyncFunc(2,2, function(err, result) {
             self.step2 = true;
             self.end();

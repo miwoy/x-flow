@@ -134,7 +134,7 @@ Flow.prototype.exec = function(callback) {
 
     _.each(this.matrix, function(context, i) {
         context.queue.push(forkEnd(i));
-        context.queue[0].call(context);
+        context.queue[0].call(context, context);
     });
 };
 
@@ -147,7 +147,7 @@ function Context() {
 
 Context.prototype.next = function() {
     this.index++;
-    this.queue[this.index].call(this);
+    this.queue[this.index].call(this, this);
 };
 Context.prototype.go = function(count) {
     if (_.isNumber(count)) throw new Error("参数必须为数字！");
