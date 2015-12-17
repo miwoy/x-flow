@@ -22,53 +22,28 @@ xFlow.begin = function() {
 xFlow.each = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
     _.each(aryOrObj, function(value, key) {
-        flow.fork(cb1(value, key));
-    });
-
-    flow.end(function(err, results) {
-        _.each(results, function(v, i) {
-            results[i] = results[i][0];
+        flow.fork(function() {
+            cb1.call(this, value, key);
         });
-
-        cb2(err, results);
     });
+
+    flow.exec(cb2);
 };
 
 /**
  * each同步版
  */
-xFlow.eachSync = function(aryOrObj, cb1, cb2, cb3) {
+xFlow.eachSync = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
     var rlts;
     _.each(aryOrObj, function(v, k) {
-        if (cb2) {
-            flow.next(function() {
-                if (arguments.length > 0) {
-                    rlts = rlts || [];
-                    rlts.push(_.values(arguments).slice(1));
-                    cb2.apply(this, _.values(arguments));
-
-                }
-
-                return cb1(v, k);
-            });
-        } else {
-            flow.next(cb1(v, k));
-        }
+        
+        flow.step(function() {
+            cb1.call(this, v, k);
+        });
 
     });
-    flow.end(function(err, results) {
-        if (cb2) {
-            rlts = rlts || [];
-            rlts.push(results[0][0]);
-            cb2.apply(this, [err].concat(results[0][0]));
-        }
-        if (cb3) {
-            rlts = rlts || results[0];
-            cb3(err, rlts);
-        }
-
-    });
+    flow.exec(cb2);
 };
 
 module.exports = xFlow;
@@ -136,8 +111,8 @@ Flow.prototype.exec = function(callback) {
     var results = new Array(this.matrix.length);
     var forkEnd = function(i) {
         var index = i;
-        return function(err, context) {
-
+        return function(err) {
+            var context = this;
             if (cded) {
                 return;
             }
@@ -183,9 +158,9 @@ Context.prototype.go = function(count) {
     this.queue[this.index].call(this);
 };
 Context.prototype.err = function(err) {
-    this.queue[this.queue.length - 1](err, this);
+    this.queue[this.queue.length - 1].call(this, err);
 };
-Context.prototype.end = function(err) {
-    this.queue[this.queue.length - 1](err, this);
+Context.prototype.end = function() {
+    this.queue[this.queue.length - 1].call(this);
 
 };

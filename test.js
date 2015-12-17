@@ -23,7 +23,7 @@ x.begin()
         var self = this;
         obj.asyncFunc(1,1, function(err, result) {
             self.step1 = true;
-            self.err(true);
+            self.err();
             //self.next();
         });
     })
@@ -66,29 +66,43 @@ x.begin()
     });
 
 
-// /**
-//  * 测试each与eachSync部分
-//  */
+/**
+ * 测试each与eachSync部分
+ */
 
 // var objEach = {
 //     asyncFunc: function(value, index, callback) {
 //         setTimeout(function() {
 //             console.log("第" + index + "此执行");
-//             callback(null, value);
+//             callback(true, value);
 //         }, 100);
 //     }
 // };
 // var b= "dasf";
 // // 同步遍历
-// // x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
-// //     return [objEach, objEach.asyncFunc, [v, i]];
-// // }, null, function(err, results) {
-// //     console.log(results);
-// // });
+// x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
+//     var ctx = this;
+//     objEach.asyncFunc(v,i, function(err, result) {
+//         if (err) {
+//             return ctx.err(err);
+//         }
+//         ctx.result = result;
+//         ctx.next();
+//     });
+// }, function(err, results) {
+//     console.log(results);
+// });
 
 // // 异步遍历
 // x.each(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
-//     return [objEach, objEach.asyncFunc, [v, i]];
+//     var ctx = this;
+//     objEach.asyncFunc(v,i, function(err, result) {
+//         if (err) {
+//             return ctx.err(err);
+//         }
+//         ctx.result = result;
+//         ctx.end();
+//     });
 // }, function(err, results) {
 //     console.log("results", results);
 // });
