@@ -132,6 +132,7 @@ Flow.prototype.exec = function(callback) {
         };
     };
 
+    if (this.matrix.length === 0) return callback(null,[]);
     _.each(this.matrix, function(context, i) {
         context.queue.push(forkEnd(i));
         context.queue[0].call(context, context);
