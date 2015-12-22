@@ -37,7 +37,7 @@ xFlow.eachSync = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
     var rlts;
     _.each(aryOrObj, function(v, k) {
-        
+
         flow.step(function() {
             cb1.call(this, v, k);
         });
@@ -132,7 +132,7 @@ Flow.prototype.exec = function(callback) {
         };
     };
 
-    if (this.matrix.length === 0) return callback(null,[]);
+    if (this.matrix.length === 0) return callback(null, []);
     _.each(this.matrix, function(context, i) {
         context.queue.push(forkEnd(i));
         context.queue[0].call(context, context);
@@ -148,6 +148,8 @@ function Context() {
 
 Context.prototype.next = function() {
     this.index++;
+    if (this.index === this.queue.length - 1)
+        return this.queue[this.index].call(this);
     this.queue[this.index].call(this, this);
 };
 Context.prototype.go = function(count) {
