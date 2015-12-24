@@ -158,7 +158,7 @@ Context.prototype.go = function(count) {
 
 
     this.index += count;
-    this.queue[this.index].call(this);
+    this.queue[this.index].call(this, this);
 };
 Context.prototype.err = function(err) {
     this.queue[this.queue.length - 1].call(this, err);
