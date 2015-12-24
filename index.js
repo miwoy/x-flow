@@ -153,7 +153,7 @@ Context.prototype.next = function() {
     this.queue[this.index].call(this, this);
 };
 Context.prototype.go = function(count) {
-    if (_.isNumber(count)) throw new Error("参数必须为数字！");
+    if (!_.isNumber(count)) throw new Error("参数必须为数字！");
     if (count + this.index < 0 || count + this.index > this.queue.length - 2) throw new Error("索引超出界限！");
 
 
