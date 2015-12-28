@@ -5,99 +5,126 @@ var _ = require('underscore');
  *  测试并行与串行结合部分
  */
 
-var obj = {
-	// 定义一个有上下文的异步函数
-    asyncFunc: function(forkNum,funcNum, callback) {
-        setTimeout(function() {
-            console.log("第" + forkNum + "个分支的第" +funcNum + "异步函数开始执行");
-            callback(null, "第" + forkNum + "个分支的第" +funcNum + "异步函数执行结果");
-        },100);
-    }
-};
+// var obj = {
+//     // 定义一个有上下文的异步函数
+//     asyncFunc: function(forkNum, funcNum, callback) {
+//         setTimeout(function() {
+//             console.log("第" + forkNum + "个分支的第" + funcNum + "异步函数开始执行");
+//             callback(null, "第" + forkNum + "个分支的第" + funcNum + "异步函数执行结果");
+//         }, 100);
+//     }
+// };
 
 
-// 开始一个x流，可以为begin传递一个x流数据结构
-x.begin()
-	// 指定异步函数执行上下文
-    .step(function(self){
-        obj.asyncFunc(1,1, function(err, result) {
-            self.step1 = true;
-            self.next();
-        });
-    })
-    // 用回调函数获取上一次异步结果，并返回一个x流执行数据结构的数组对象
-    .step(function(self){
-        obj.asyncFunc(1,2, function(err, result) {
-            self.step2 = true;
-            self.end();
-        });
-    })
-    // 开启一个分支。分支将与begin主线并行执行
-    .fork()
-    // 未获取上次异步函数执行结果，将会把结果传递至end函数results中
-    .step(function(self){
-        obj.asyncFunc(2,1, function(err, result) {
-            self.step1 = true;
-            self.next();
-        });
-    })
-    // 未获取上次异步执行结果，并未传递异步函数执行上下文 
-    .step(function(self){
-        obj.asyncFunc(2,2, function(err, result) {
-            self.step2 = true;
-            self.end();
-        });
-    })
-    /** 
-     * x流结束，当流中某处出现错误时都将直接执行end方法
-     * 并将错误传给err参数
-     * results会把所有在流中未获取的返回值合并成数组 
-     * results: [[第一个分支（begin）所有未获取的返回值集合],[第二个分支（fork）所有未获取的返回值集合]...]
-     * 通常每个分支只有最后一个next的返回值未获取，那么当你取begin分支的结果事可能是这样的 results[0][0]
-     * results[0][0][0] 代表第一个分支第一个未获取的next返回值的非err的第一个参数	
-     **/
-    .exec(function(err, results) {
-        console.log("end",err, results);
-    });
+// // 开始一个流，返回flow对象
+// x.begin()
+//     // 指定异步函数执行上下文
+//     .step(function(context) {
+//         obj.asyncFunc(1, 1, function(err, result) {
+//             if (err) {
+//                 return context.err(err); // 传递异常
+//             }
+
+//             context.step1 = true; // 步骤间传递数据
+//             context.next(); // 进入下一步
+//         });
+//     })
+//     .step(function(context) {
+//         obj.asyncFunc(1, 2, function(err, result) {
+//             if (err) {
+//                 return context.err(err); // 传递异常
+//             }
+
+//             console.log("step1:", context.step1); // 打印上一步的数据  step1: true
+//             context.step2 = true;
+//             context.end(); // 结束此分支流
+//         });
+//     })
+//     // 开启一个分支。分支将与begin主线并行执行
+//     .fork()
+//     .step(function(context) {
+//         obj.asyncFunc(2, 1, function(err, result) {
+//             if (err) {
+//                 return context.err(err); // 传递异常
+//             }
+
+//             context.step1 = true;
+//             context.go(1); // 使用go进入下一步 
+//         });
+//     })
+//     .step(function(context) {
+//         obj.asyncFunc(2, 2, function(err, result) {
+//             if (err) {
+//                 return context.err(err); // 传递异常
+//             }
+
+//             context.step2 = true;
+//             context.end();
+//         });
+//     })
+//     // 开始执行
+//     .exec(function(err, results) {
+//         if (err) {
+//             return console.log("err:", err); // 如果有错误打印错误信息
+//         }
+//         console.log("results:", results); // 正常时打印结果集 results: [ Context { step1: true, step2: true }, Context { step1: true, step2: true } ]
+//     });
+
 
 
 /**
  * 测试each与eachSync部分
  */
 
-// var objEach = {
-//     asyncFunc: function(value, index, callback) {
-//         setTimeout(function() {
-//             console.log("第" + index + "此执行");
-//             callback(true, value);
-//         }, 100);
-//     }
-// };
-// var b= "dasf";
-// // 同步遍历
-// x.eachSync(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
-//     var ctx = this;
-//     objEach.asyncFunc(v,i, function(err, result) {
-//         if (err) {
-//             return ctx.err(err);
-//         }
-//         ctx.result = result;
-//         ctx.next();
-//     });
-// }, function(err, results) {
-//     console.log(results);
-// });
+var objEach = {
+    asyncFunc: function(value, index, callback) {
+        setTimeout(function() {
+            console.log("第" + index + "此执行");
+            // callback(new Error("test err!"), value);
+            callback(null, value);
+        }, 100);
+    }
+};
+
+// 同步遍历
+x.eachSync(-9, function(item, index) {
+    var context = this;  // 获取执行环境
+    objEach.asyncFunc(item, index, function(err, result) {
+        if (err) {
+            return context.err(err);
+        }
+
+        context.results = context.results || [];   // 初始化结果集
+        context.results.push(result);
+        context.next();
+    });
+}, function(err, results) {
+    if (err) {
+        return console.log("err:", err.message); // err: test err!
+    }
+
+    console.log("results:", results); // results: [ Context { results: [ '第一次返回', '第二次返回', '第三次返回' ] } ]
+
+});
 
 // // 异步遍历
-// x.each(["第一次返回", "第二次返回", "第三次返回"], function(v, i) {
-//     var ctx = this;
-//     objEach.asyncFunc(v,i, function(err, result) {
+// x.each({
+//     one: "第一次返回",
+//     two: "第二次返回",
+//     three: "第三次返回"
+// }, function(value, key) {
+//     var context = this;   // 获取执行环境
+//     objEach.asyncFunc(value, key, function(err, result) {
 //         if (err) {
-//             return ctx.err(err);
+//             return context.err(err);
 //         }
-//         ctx.result = result;
-//         ctx.end();
+
+//         context.result = result;
+//         context.end();
 //     });
 // }, function(err, results) {
-//     console.log("results", results);
+//     if (err) {
+//         return console.log("err:", err);    // err: test err!
+//     }
+//     console.log("results", results);    // results [ Context { result: '第一次返回' },Context { result: '第二次返回' },Context { result: '第三次返回' } ]
 // });

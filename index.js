@@ -1,11 +1,11 @@
 var _ = require('underscore');
 
 // 导出对象
-var xFlow = {};
+var x = {};
 
 
 // 开始一个x --> 流
-xFlow.begin = function() {
+x.begin = function() {
     var flow = new Flow();
     return flow;
 
@@ -15,12 +15,12 @@ xFlow.begin = function() {
  * 遍历一个数组或对象，遍历结果在第一个回调函数中返回，异步结果在第二个回调中返回
  * @param  {[type]} aryOrObj 要遍历的数组或对象
  * @param  {[type]} cb1      遍历结果，返回value与key，如果是数组返回value与index.
- *                           此回调函数需要返回一个数组，数组内包含操作函数与所需参数
- *                           例：return [func, args];
  * @param  {[type]} cb2      待所有异步处理完成或出现错误时的回调函数
  */
-xFlow.each = function(aryOrObj, cb1, cb2) {
+x.each = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
+
+    if (_.isNumber(aryOrObj)) aryOrObj = _.range(0, aryOrObj, aryOrObj < 0 ? -1 : 1);
     _.each(aryOrObj, function(value, key) {
         flow.fork(function() {
             cb1.call(this, value, key);
@@ -33,9 +33,10 @@ xFlow.each = function(aryOrObj, cb1, cb2) {
 /**
  * each同步版
  */
-xFlow.eachSync = function(aryOrObj, cb1, cb2) {
+x.eachSync = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
-    var rlts;
+
+    if (_.isNumber(aryOrObj)) aryOrObj = _.range(0, aryOrObj, aryOrObj < 0 ? -1 : 1);
     _.each(aryOrObj, function(v, k) {
 
         flow.step(function() {
@@ -43,37 +44,36 @@ xFlow.eachSync = function(aryOrObj, cb1, cb2) {
         });
 
     });
+
     flow.exec(cb2);
 };
 
-module.exports = xFlow;
+module.exports = x;
 
-// 流对象
+/**
+ * 流对象
+ */
 function Flow() {
-    this.matrix = [];
+    this.matrix = []; // 配置矩阵
 }
 
 /**
- * 串行执行
- * @param  {Function} callback 执行异步操作前的初始化函数，
- *                             注意：会将上一步结果传递给此函数
- *                             如果需要上一次异步操作的结果，可在参数中获取
- *                             在不需要即使处理上一步结果时可填写两个参数 func,args 或 [func,args]
- *                             如使用callback，需要确保callback要有返回值，返回[func,args]
- *                             如果该异步函数依赖于一个环境时，需要把该环境传递进来
+ * 配置步骤
+ * @param  {Function} callback 步骤执行内容，省略或传入非function类型将抛出异常
+ *                             回调函数中可接受此回调函数执行上下文环境，用于分支流间数据传递与结果处理
  */
 Flow.prototype.step = function() {
 
-    if (arguments.length === 0 || !_.isFunction(arguments[0])) return this;
+    if (arguments.length === 0 || !_.isFunction(arguments[0])) throw new Error("参数类型错误！");
 
     var context;
-    var rlt;
-    if (this.matrix.length === 0) {
-        context = new Context();
-        context.queue.push(arguments[0]);
-        this.matrix.push(context);
 
-    } else {
+    if (this.matrix.length === 0) { // 如果矩阵长度为0时配置矩阵默认队列
+        context = new Context(); // 初始化context对象
+        context.queue.push(arguments[0]); // 为队列增加步骤
+        this.matrix.push(context); // 为矩阵增加context队列对象
+
+    } else { // 如果矩阵长度不为0时取矩阵最后一个context队列对象
         context = this.matrix[this.matrix.length - 1];
         context.queue.push(arguments[0]);
 
@@ -84,55 +84,58 @@ Flow.prototype.step = function() {
 };
 
 /**
- * 并行执行
- * @param  {Object} context 执行环境，如果该异步函数依赖于一个环境时，需要把该环境传递进来
- * @param  {Function} func  要执行的异步函数，确保参数中回调函数位置在参数最后一位
- *                          可接受单个数组参数[func, args]
- * @param  {Array} args     异步函数所需参数（不要带上回调函数，此工具默认会在最后位置添加一个callback）                   
+ * 开启分支流
+ * @param  {Function} [callback] 效果与step的回调一致，默认配置成分支流队列的顶端。可省略                   
  */
 Flow.prototype.fork = function() {
-    var context = new Context();
+    var context = new Context(); // 初始化context对象
 
     if (_.isFunction(arguments[0])) context.queue.push(arguments[0]);
 
-    this.matrix.push(context);
+    this.matrix.push(context); // 为矩阵增加context队列对象
 
     return this;
 };
 
 /**
- * 结束
- * @param  {Function} callback err,results 当流程出现错误时会第一时间传递给err,没有错误则将流程内未处理的结果集合并成一个数组对象
+ * 执行函数
+ * @param  {Function} callback err,results 当流程出现错误时会第一时间传递给err,没有错误则将各个分支流的context对象合并成数组返回给results
  */
 Flow.prototype.exec = function(callback) {
-    var self = this;
-    var num = 1;
-    var cded = false;
-    var results = new Array(this.matrix.length);
+    var self = this; // 取this对象
+    var num = 1; // 并行分支计数器
+    var cded = false; // 异常处理断定器，
+    var results = new Array(this.matrix.length); // 初始化结果集
     var forkEnd = function(i) {
-        var index = i;
-        return function(err) {
+        return function(err) { // 分支结束函数，利用闭包维持索引i
             var context = this;
-            if (cded) {
+            if (cded) { // 当断定器断定已经有异常发生并被处理时，其他并行分支的异常或结果均会被抛弃
                 return;
             }
 
+            // 删除内置属性
             delete context.queue;
             delete context.index;
 
+            // 出现错误时立即返回，并将出现错误的环境对象放入回调第二个参数位置返回
             if (err) {
                 cded = true;
                 return callback(err, context);
             }
 
             results[i] = context;
+
+            // 计数器等于矩阵长度时，确认最终数据返回
             if (++num > self.matrix.length) {
                 callback(err, results);
             }
         };
     };
 
+    // 矩阵长度为0， 立即返回
     if (this.matrix.length === 0) return callback(null, []);
+
+    // 遍历矩阵，开始执行
     _.each(this.matrix, function(context, i) {
         context.queue.push(forkEnd(i));
         context.queue[0].call(context, context);
@@ -140,19 +143,33 @@ Flow.prototype.exec = function(callback) {
 };
 
 
-
+/**
+ * 队列环境对象
+ */
 function Context() {
-    this.queue = [];
-    this.index = 0;
+    this.queue = []; // 队列
+    this.index = 0; // 队列索引记录器
 }
 
+/**
+ * 下一步
+ */
 Context.prototype.next = function() {
     this.index++;
+
+    // 如果是队列末尾，执行分支结束函数
     if (this.index === this.queue.length - 1)
         return this.queue[this.index].call(this);
     this.queue[this.index].call(this, this);
 };
+
+/**
+ * 跳转
+ * @param  {[type]} count 步长，以自身为零点，向上为负数，向下为正数
+ */
 Context.prototype.go = function(count) {
+
+    // 异常处理
     if (!_.isNumber(count)) throw new Error("参数必须为数字！");
     if (count + this.index < 0 || count + this.index > this.queue.length - 2) throw new Error("索引超出界限！");
 
@@ -160,10 +177,19 @@ Context.prototype.go = function(count) {
     this.index += count;
     this.queue[this.index].call(this, this);
 };
+
+/**
+ * 异常传递
+ * @param  {[type]} err 异常对象
+ */
 Context.prototype.err = function(err) {
     this.queue[this.queue.length - 1].call(this, err);
 };
+
+/**
+ * 结束函数
+ * @return {[type]} [description]
+ */
 Context.prototype.end = function() {
     this.queue[this.queue.length - 1].call(this);
-
 };
