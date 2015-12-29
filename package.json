@@ -1,14 +1,14 @@
 {
   "name": "x-flow",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "x --> flow",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node node_modules/.bin/istanbul cover _mocha"
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:miwoy/x-flow.git"
+    "url": "git@github.com/miwoy/x-flow.git"
   },
   "keywords": [
     "flow",
@@ -19,6 +19,11 @@
   "author": "miwoy",
   "license": "ISC",
   "dependencies": {
+    "should": "^8.0.2",
     "underscore": "^1.8.3"
+  },
+  "devDependencies": {
+    "istanbul": "^0.4.1",
+    "mocha": "^2.3.4"
   }
 }
