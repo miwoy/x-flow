@@ -19,10 +19,10 @@
   "author": "miwoy",
   "license": "ISC",
   "dependencies": {
-    "should": "^8.0.2",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
+    "should": "^8.0.2",
     "istanbul": "^0.4.1",
     "mocha": "^2.3.4"
   }
