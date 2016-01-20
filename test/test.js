@@ -1,8 +1,7 @@
 var should = require('should');
 var x = require('../index');
+var error = require('../error');
 
-
-var testArray = ["one", "tow", "three"];
 var objEach = {
     asyncFunc: function(value, index, callback) {
         setTimeout(function() {
@@ -12,10 +11,22 @@ var objEach = {
     }
 };
 
+var obj = {
+    asyncFunc: function(callback) {
+        setTimeout(function() {
+            callback(null, true);
+        }, 10);
+    }
+};
+
 describe("测试eachAsync部分", function() {
     it("返回值必须是遍历的数组", function(done) {
         // 同步遍历
-        x.eachSync(testArray, function(item, index) {
+        x.eachSync({
+            0: "one",
+            1: "two",
+            2: "three"
+        }, function(item, index) {
             var context = this; // 获取执行环境
             objEach.asyncFunc(item, index, function(err, result) {
                 if (err) {
@@ -30,13 +41,13 @@ describe("测试eachAsync部分", function() {
             should.not.exist(err);
             should.exist(results);
             should(results).be.a.Array();
-            results[0].results.should.be.eql(["one", "tow", "three"]);
+            results[0].results.should.be.eql(["one", "two", "three"]);
             done();
         });
     });
 
     it("异常必须是'test error!'", function(done) {
-        x.eachSync(testArray, function(item, index) {
+        x.eachSync(["one", "two", "three"], function(item, index) {
             var context = this; // 
             objEach.asyncFunc(item, index, function(err, result) {
 
@@ -54,12 +65,21 @@ describe("测试eachAsync部分", function() {
             done();
         });
     });
+
+    it("测试传入参数不为数组对象数字字符串时", function() {
+        var num = 0;
+        x.each(null, function(item, index) {
+            num++;
+        });
+
+        should(num).be.eql(0);
+    });
 });
 
 describe("测试each部分", function() {
     it("返回值必须是传入的数组", function(done) {
         // 同步遍历
-        x.each(testArray, function(item, index) {
+        x.each(-9, function(item, index) {
             var context = this; // 获取执行环境
             objEach.asyncFunc(item, index, function(err, result) {
                 if (err) {
@@ -73,17 +93,12 @@ describe("测试each部分", function() {
             should.not.exist(err);
             should.exist(results);
             should(results).be.a.Array();
-
-            for (var i = 0; i < results.length; i++) {
-                results[i].result.should.be.eql(testArray[i]);
-            }
-
             done();
         });
     });
 
     it("异常必须是'test error!'", function(done) {
-        x.each(testArray, function(item, index) {
+        x.each(9, function(item, index) {
             var context = this; // 
             objEach.asyncFunc(item, index, function(err, result) {
 
@@ -102,16 +117,6 @@ describe("测试each部分", function() {
         });
     });
 });
-
-
-var obj = {
-    asyncFunc: function(callback) {
-        var self = this;
-        setTimeout(function() {
-            callback(null, true);
-        }, 10);
-    }
-};
 
 describe("测试并行与串行结合部分", function() {
     it("results长度必须等于分支长度，step值必须等于其分支下step的数量", function(done) {
@@ -214,5 +219,64 @@ describe("测试并行与串行结合部分", function() {
                 err.message.should.be.eql("test error!");
                 done();
             });
+    });
+
+    it("测试step参数为空或不为函数时，抛出类型错误异常", function(done) {
+        try {
+            x.begin()
+                .step()
+                .exec(function(err, results) {
+
+                });
+        } catch (e) {
+            should(e.name).be.eql("ArgsType Error");
+            done();
+        }
+    });
+    it("测试go函数参数不为Number，抛出类型错误异常", function(done) {
+        try {
+            x.begin()
+                .step(function(ctx) {
+                    ctx.go("q");
+                })
+                .exec(function(err, results) {
+
+                });
+        } catch (e) {
+            should(e.name).be.eql("ArgsType Error");
+            done();
+        }
+    });
+    it("测试go函数参数索引越界，抛出类型错误异常", function(done) {
+        try {
+            x.begin()
+                .step(function(ctx) {
+                    ctx.go(2);
+                })
+                .exec(function(err, results) {
+
+                });
+        } catch (e) {
+            should(e.name).be.eql("RangeError");
+            done();
+        }
+    });
+
+    it("测试矩阵长队为零时，results等于[]", function() {
+        x.begin()
+            .exec(function(err, results) {
+                should(results).be.eql([]);
+            });
+    });
+});
+
+describe("测试Error部分", function() {
+    it("ArgsValueError name is 'ArgsValue Error'", function() {
+        var err = new error.ArgsValueError(9, "参数值不能大于5");
+        should(err.name).be.eql("ArgsValue Error");
+    });
+    it("ArgsError name is 'Args Error'", function() {
+        var err = new error.ArgsError(9);
+        should(err.name).be.eql("Args Error");
     });
 });

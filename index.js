@@ -1,4 +1,5 @@
-var _ = require('underscore');
+var util = require('util');
+var error = require('./error');
 
 // 导出对象
 var x = {};
@@ -20,8 +21,7 @@ x.begin = function() {
 x.each = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
 
-    if (_.isNumber(aryOrObj)) aryOrObj = _.range(0, aryOrObj, aryOrObj < 0 ? -1 : 1);
-    _.each(aryOrObj, function(value, key) {
+    each(aryOrObj, function(value, key) {
         flow.fork(function() {
             cb1.call(this, value, key);
         });
@@ -36,8 +36,7 @@ x.each = function(aryOrObj, cb1, cb2) {
 x.eachSync = function(aryOrObj, cb1, cb2) {
     var flow = new Flow();
 
-    if (_.isNumber(aryOrObj)) aryOrObj = _.range(0, aryOrObj, aryOrObj < 0 ? -1 : 1);
-    _.each(aryOrObj, function(v, k) {
+    each(aryOrObj, function(v, k) {
 
         flow.step(function() {
             cb1.call(this, v, k);
@@ -64,7 +63,7 @@ function Flow() {
  */
 Flow.prototype.step = function() {
 
-    if (arguments.length === 0 || !_.isFunction(arguments[0])) throw new Error("参数类型错误！");
+    if (arguments.length === 0 || !util.isFunction(arguments[0])) throw new error.ArgsTypeError(arguments[0]);
 
     var context;
 
@@ -90,7 +89,7 @@ Flow.prototype.step = function() {
 Flow.prototype.fork = function() {
     var context = new Context(); // 初始化context对象
 
-    if (_.isFunction(arguments[0])) context.queue.push(arguments[0]);
+    if (util.isFunction(arguments[0])) context.queue.push(arguments[0]);
 
     this.matrix.push(context); // 为矩阵增加context队列对象
 
@@ -120,23 +119,23 @@ Flow.prototype.exec = function(callback) {
             // 出现错误时立即返回，并将出现错误的环境对象放入回调第二个参数位置返回
             if (err) {
                 cded = true;
-                return callback(err, context);
+                return callback && callback(err, context);
             }
 
             results[i] = context;
 
             // 计数器等于矩阵长度时，确认最终数据返回
             if (++num > self.matrix.length) {
-                callback(err, results);
+                callback && callback(err, results);
             }
         };
     };
 
     // 矩阵长度为0， 立即返回
-    if (this.matrix.length === 0) return callback(null, []);
+    if (this.matrix.length === 0) return callback && callback(null, []);
 
     // 遍历矩阵，开始执行
-    _.each(this.matrix, function(context, i) {
+    each(this.matrix, function(context, i) {
         context.queue.push(forkEnd(i));
         context.queue[0].call(context, context);
     });
@@ -170,8 +169,8 @@ Context.prototype.next = function() {
 Context.prototype.go = function(count) {
 
     // 异常处理
-    if (!_.isNumber(count)) throw new Error("参数必须为数字！");
-    if (count + this.index < 0 || count + this.index > this.queue.length - 2) throw new Error("索引超出界限！");
+    if (!util.isNumber(count)) throw new error.ArgsTypeError(count, "必须是Number类型！");
+    if (count + this.index < 0 || count + this.index > this.queue.length - 2) throw new RangeError("索引" + (count + this.index) +"超出界限！");
 
 
     this.index += count;
@@ -193,3 +192,32 @@ Context.prototype.err = function(err) {
 Context.prototype.end = function() {
     this.queue[this.queue.length - 1].call(this);
 };
+
+/**
+ * 自构建each函数，支持遍历数组对象数字字符串
+ * @param  {[type]}   obj      [description]
+ * @param  {Function} callback [description]
+ * @return {[type]}            [description]
+ */
+function each(obj, callback) {
+    if (util.isString(obj) || util.isArray(obj)) {
+        for (var i = 0; i < obj.length; i++) {
+            callback(obj[i], i);
+        }
+    } else if (util.isObject(obj) && !util.isFunction(obj)) {
+        for (var key in obj) {
+            callback(obj[key], key);
+        }
+    } else if (util.isNumber(obj)) {
+        if (obj > 0) {
+            for (var i = 0; i < obj; i++) {
+                callback(obj - i, i);
+            }
+        } else {
+            for (var i = 0; i < -obj; i++) {
+                callback(obj + i, i);
+            }
+
+        }
+    }
+}

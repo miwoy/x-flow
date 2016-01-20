@@ -1,5 +1,4 @@
 var x = require('./index');
-var _ = require('underscore');
 
 /**
  *  测试并行与串行结合部分

@@ -1,6 +1,6 @@
 {
   "name": "x-flow",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "x --> flow",
   "main": "index.js",
   "scripts": {
@@ -19,7 +19,6 @@
   "author": "miwoy",
   "license": "ISC",
   "dependencies": {
-    "underscore": "^1.8.3"
   },
   "devDependencies": {
     "should": "^8.0.2",
