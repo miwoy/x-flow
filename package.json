@@ -1,6 +1,6 @@
 {
   "name": "x-flow",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "x --> flow",
   "main": "index.js",
   "scripts": {
