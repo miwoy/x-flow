@@ -1,8 +1,7 @@
 (function() {
-    try {
-        if (window !== undefined) {
+    var isBrowser = typeof window !== 'undefined';
 
-        }
+    if (isBrowser) {
         var util = {};
         var isType = function(type) {
             return function(value) {
@@ -21,11 +20,13 @@
         util.isNull = isType("Null");
         util.isUndefined = isType("Undefined");
 
-
-        window.x = init(util, {
+        window.xFlow = init(util, {
             ArgsTypeError: Error
         });
-    } catch (e) {
+        if (typeof window.x === 'undefined') {
+            window.x = window.xFlow;
+        }
+    } else {
         var util = require('util');
         var error = require('./error');
 
@@ -52,6 +53,7 @@
          * @param  {[type]} cb2      待所有异步处理完成或出现错误时的回调函数
          */
         x.each = function(aryOrObj, cb1, cb2) {
+            if (!util.isFunction(cb1)) throw new error.ArgsTypeError(cb1, "cb1必须是Function类型！");
             var flow = new Flow();
 
             each(aryOrObj, function(value, key) {
@@ -67,6 +69,7 @@
          * each同步版
          */
         x.eachSync = function(aryOrObj, cb1, cb2) {
+            if (!util.isFunction(cb1)) throw new error.ArgsTypeError(cb1, "cb1必须是Function类型！");
             var flow = new Flow();
 
             each(aryOrObj, function(v, k) {
@@ -144,9 +147,10 @@
                         return;
                     }
 
-                    // 删除内置属性
-                    delete context.queue;
-                    delete context.index;
+                    // 清理内置属性（赋值 undefined 而非 delete，防止暴露原型链属性）
+                    context.queue = undefined;
+                    context.index = undefined;
+                    context._done = undefined;
 
                     // 出现错误时立即返回，并将出现错误的环境对象放入回调第二个参数位置返回
                     if (err) {
@@ -180,17 +184,21 @@
         function Context() {
             this.queue = []; // 队列
             this.index = 0; // 队列索引记录器
+            this._done = false; // 防止 next/end/err 重复调用
         }
 
         /**
          * 下一步
          */
         Context.prototype.next = function() {
+            if (this._done) return;
             this.index++;
 
             // 如果是队列末尾，执行分支结束函数
-            if (this.index === this.queue.length - 1)
+            if (this.index === this.queue.length - 1) {
+                this._done = true;
                 return this.queue[this.index].call(this);
+            }
             this.queue[this.index].call(this, this);
         };
 
@@ -214,6 +222,8 @@
          * @param  {[type]} err 异常对象
          */
         Context.prototype.err = function(err) {
+            if (this._done) return;
+            this._done = true;
             this.queue[this.queue.length - 1].call(this, err);
         };
 
@@ -222,6 +232,8 @@
          * @return {[type]} [description]
          */
         Context.prototype.end = function() {
+            if (this._done) return;
+            this._done = true;
             this.queue[this.queue.length - 1].call(this);
         };
 
@@ -238,7 +250,9 @@
                 }
             } else if (util.isObject(obj) && !util.isFunction(obj)) {
                 for (var key in obj) {
-                    callback(obj[key], key);
+                    if (obj.hasOwnProperty(key)) {
+                        callback(obj[key], key);
+                    }
                 }
             } else if (util.isNumber(obj)) {
                 if (obj > 0) {
